@@ -10,6 +10,7 @@ use std::{
     ffi::CString,
     io::{Read, Seek},
     marker::PhantomData,
+    ptr::{NonNull, null_mut},
 };
 
 /// Streamed music played from an audio file.
@@ -55,6 +56,7 @@ use std::{
 #[derive(Debug)]
 pub struct Music<'memsrc> {
     music: *mut ffi::sfMusic,
+    istream: Option<NonNull<InputStream>>,
     borrow: PhantomData<&'memsrc [u8]>,
 }
 
@@ -81,6 +83,7 @@ impl Music<'static> {
         } else {
             Some(Music {
                 music: music_tmp,
+                istream: None,
                 borrow: PhantomData,
             })
         }
@@ -102,14 +105,16 @@ impl<'memsrc> Music<'memsrc> {
     ///
     /// [`play`]: Music::play
     pub fn from_stream<T: Read + Seek>(stream: &'memsrc mut T) -> Option<Self> {
-        let mut input_stream = InputStream::new(stream);
+        let istream = NonNull::new(Box::into_raw(Box::new(InputStream::new(stream))));
+        let input_stream = istream.map_or_else(null_mut, |n| n.as_ptr()) as *mut _;
         let music_tmp: *mut ffi::sfMusic =
-            unsafe { ffi::sfMusic_createFromStream(&mut input_stream.0) };
+            unsafe { ffi::sfMusic_createFromStream(input_stream) };
         if music_tmp.is_null() {
             None
         } else {
             Some(Music {
                 music: music_tmp,
+                istream,
                 borrow: PhantomData,
             })
         }
@@ -137,6 +142,7 @@ impl<'memsrc> Music<'memsrc> {
         } else {
             Some(Music {
                 music: music_tmp,
+                istream: None,
                 borrow: PhantomData,
             })
         }
@@ -317,6 +323,9 @@ impl<'memsrc> Drop for Music<'memsrc> {
     fn drop(&mut self) {
         unsafe {
             ffi::sfMusic_destroy(self.music);
+            if let Some(n) = self.istream {
+                let _ = Box::from_raw(n.as_ptr());
+            }
         }
     }
 }

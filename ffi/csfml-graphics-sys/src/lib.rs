@@ -1208,13 +1208,13 @@ extern "C" {
         depthBuffer: sfBool,
     ) -> *mut sfRenderTexture;
 }
-extern "C" {
-    pub fn sfRenderTexture_createWithSettings(
-        width: ::std::os::raw::c_uint,
-        height: ::std::os::raw::c_uint,
-        settings: sfContextSettings,
-    ) -> *mut sfRenderTexture;
-}
+// extern "C" {
+//     pub fn sfRenderTexture_createWithSettings(
+//         width: ::std::os::raw::c_uint,
+//         height: ::std::os::raw::c_uint,
+//         settings: sfContextSettings,
+//     ) -> *mut sfRenderTexture;
+// }
 extern "C" {
     pub fn sfRenderTexture_destroy(renderTexture: *mut sfRenderTexture);
 }

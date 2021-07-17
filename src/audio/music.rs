@@ -91,6 +91,38 @@ impl Music<'static> {
 }
 
 impl<'memsrc> Music<'memsrc> {
+
+    /// Create a new music and load it from a stream (a struct implementing Read and Seek)
+    ///
+    /// This function doesn't start playing the music (call [`play`] to do so).
+    /// Here is a complete list of all the supported audio formats:
+    /// ogg, wav, flac, aiff, au, raw, paf, svx, nist, voc, ircam,
+    /// w64, mat4, mat5 pvf, htk, sds, avr, sd2, caf, wve, mpc2k, rf64.
+    ///
+    /// Experimental: creates a box around InputStream and keeps it alive.
+    ///
+    /// # Arguments
+    /// * stream - Your struct, implementing Read and Seek
+    ///
+    /// Returns `None` if loading fails.
+    ///
+    /// [`play`]: Music::play
+    pub fn from_stream_with_box<T: Read + Seek>(stream: &'memsrc mut T) -> Option<Self> {
+        let istream = NonNull::new(Box::into_raw(Box::new(InputStream::new(stream))));
+        let input_stream = istream.map_or_else(null_mut, |n| n.as_ptr()) as *mut _;
+        let music_tmp: *mut ffi::sfMusic =
+            unsafe { ffi::sfMusic_createFromStream(input_stream) };
+        if music_tmp.is_null() {
+            None
+        } else {
+            Some(Music {
+                music: music_tmp,
+                istream,
+                borrow: PhantomData,
+            })
+        }
+    }
+
     /// Create a new music and load it from a stream (a struct implementing Read and Seek)
     ///
     /// This function doesn't start playing the music (call [`play`] to do so).
@@ -105,16 +137,15 @@ impl<'memsrc> Music<'memsrc> {
     ///
     /// [`play`]: Music::play
     pub fn from_stream<T: Read + Seek>(stream: &'memsrc mut T) -> Option<Self> {
-        let istream = NonNull::new(Box::into_raw(Box::new(InputStream::new(stream))));
-        let input_stream = istream.map_or_else(null_mut, |n| n.as_ptr()) as *mut _;
+        let mut input_stream = InputStream::new(stream);
         let music_tmp: *mut ffi::sfMusic =
-            unsafe { ffi::sfMusic_createFromStream(input_stream) };
+            unsafe { ffi::sfMusic_createFromStream(&mut input_stream.0) };
         if music_tmp.is_null() {
             None
         } else {
             Some(Music {
                 music: music_tmp,
-                istream,
+                istream: None,
                 borrow: PhantomData,
             })
         }
